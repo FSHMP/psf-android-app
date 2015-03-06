@@ -1,0 +1,4 @@
+- Store fetched data in Db
+- Mark read articles
+- Parse HTML for Offline Reading
+- Service to check for new posts in regular interval
