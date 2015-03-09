@@ -1,4 +1,4 @@
-package org.psfcerd.blog.pondicherrysciecneforum;
+package org.psfcerd.blog.pondicherryscienceforum;
 
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;

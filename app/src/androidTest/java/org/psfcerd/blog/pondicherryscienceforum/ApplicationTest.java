@@ -1,4 +1,4 @@
-package org.psfcerd.blog.pondicherrysciecneforum;
+package org.psfcerd.blog.pondicherryscienceforum;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;
