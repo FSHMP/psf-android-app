@@ -6,3 +6,6 @@ Intention of the App
 - Offline Reading
 - Favorites
 - Notification on new post(s)
+
+
+Please check the TODO.md file for features implemented and to be implemented.
