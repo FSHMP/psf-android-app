@@ -1,10 +1,13 @@
 package org.psfcerd.blog.pondicherryscienceforum;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -12,19 +15,26 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 
 import com.google.code.rome.android.repackaged.com.sun.syndication.feed.synd.SyndEntry;
 import com.google.code.rome.android.repackaged.com.sun.syndication.feed.synd.SyndFeed;
 import com.google.code.rome.android.repackaged.com.sun.syndication.io.SyndFeedInput;
 import com.google.code.rome.android.repackaged.com.sun.syndication.io.XmlReader;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.psfcerd.blog.database.PostEntry;
 import org.psfcerd.blog.database.PostEntryDBHandler;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.prefs.Preferences;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -56,6 +66,9 @@ public class MainActivity extends ActionBarActivity {
         NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
         boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
 
+        // Initiate a Progress Dialog box
+        ProgressDialog progressDialog = new ProgressDialog(getApplication());
+
         @Override
         protected void onPreExecute(){
             // Grab the database handler
@@ -81,42 +94,92 @@ public class MainActivity extends ActionBarActivity {
                 list_view_handle.setAdapter(adapter);
             }
 
+            if (isConnected) {
+                progressDialog = ProgressDialog.show(MainActivity.this, "Please Wait", "checking for new entries");
+            }
+
             db.close();
 
+        }
+
+        private String getEtag(URL url){
+            try {
+                HttpClient httpClient = new DefaultHttpClient();
+                HttpResponse response = httpClient.execute(new HttpHead(url.toString()));
+                return response.getFirstHeader("Etag").getValue();
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                return null;
+            }
+        }
+
+        private void fetch_and_add_to_db(URL link, PostEntryDBHandler dbHandler){
+            try {
+                // Fetch the RSS feeds
+                SyndFeedInput input = new SyndFeedInput();
+                feed = input.build(new XmlReader(link));
+
+                Iterator entryIter = feed.getEntries().iterator();
+
+                while (entryIter.hasNext()) {
+                    SyndEntry entry = (SyndEntry) entryIter.next();
+                    dbHandler.addPostEntry(new PostEntry(entry.getTitle(), entry.getUri(),
+                            entry.getDescription().toString(), entry.getPublishedDate().toString(), null));
+                }
+            }
+            catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
 
         @Override
         protected Void doInBackground(URL... urls) {
 
             try {
+                SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+
                 // Get the database Handler
                 PostEntryDBHandler db = new PostEntryDBHandler(getApplicationContext());
                 int dbCount = db.getTotalCount();
 
-                /** If there is no internet connection when the application
-                 * starts for first time, redirect to NoInternet Activity.
-                 */
-
+                // Starting app for the very first time w/o Internet
                 if (!isConnected && dbCount==0)
                 {
                     Intent intent = new Intent(getApplicationContext(), NoInternetActivity.class);
                     startActivity(intent);
                     finish();
                 }
-                else if (isConnected) {
-                    // Get the RSS feeds
-                    SyndFeedInput input = new SyndFeedInput();
-                    feed = input.build(new XmlReader(urls[0]));
+                // Starting app for the very first time with Internet
+                else if (isConnected && dbCount==0) {
 
-                    Iterator entryIter = feed.getEntries().iterator();
+                    Log.i("MESSAGE:", "First time with Internet");
 
-                    while (entryIter.hasNext()) {
-                        SyndEntry entry = (SyndEntry) entryIter.next();
-                        db.addPostEntry(new PostEntry(entry.getTitle(), entry.getUri(),
-                                entry.getDescription().toString(), entry.getPublishedDate().toString(), null));
-                    }
+                    // Get Etag from Server
+                    String etag = getEtag(urls[0]);
 
+                    // Write the Etag value to shared preferences
+                    sharedPreferences.edit().putString("ETag", etag).apply();
+
+                    // Add feeds to database
+                    fetch_and_add_to_db(urls[0], db);
+
+                    // Set the flag to True
                     proceed = true;
+                }
+
+                else if(dbCount !=0 && isConnected){
+
+                    Log.i("MESSAGE:", "Other time with Internet");
+
+                    String stored_etag = sharedPreferences.getString("ETag", "");
+                    String etag_value = getEtag(urls[0]);
+
+                    if (!stored_etag.equals(etag_value)) {
+                        Log.i("MESSAGE:", "Fetching new entries");
+                        fetch_and_add_to_db(urls[0], db);
+                        proceed = true;
+                    }
                 }
 
                 db.close();
@@ -130,7 +193,11 @@ public class MainActivity extends ActionBarActivity {
         @Override
         protected void onPostExecute(Void result) {
 
+            // Dismiss the waiting progressDialog
+            progressDialog.dismiss();
+
             if (proceed) {
+
                 // Get the ListView declared in the UI
                 ListView list_view_handle = (ListView) findViewById(R.id.entries_list);
 
