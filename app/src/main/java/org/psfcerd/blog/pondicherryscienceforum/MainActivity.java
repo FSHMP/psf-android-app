@@ -13,9 +13,10 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.ProgressBar;
 
 import com.google.code.rome.android.repackaged.com.sun.syndication.feed.synd.SyndEntry;
 import com.google.code.rome.android.repackaged.com.sun.syndication.feed.synd.SyndFeed;
@@ -29,12 +30,10 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.psfcerd.blog.database.PostEntry;
 import org.psfcerd.blog.database.PostEntryDBHandler;
 
-import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.prefs.Preferences;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -53,6 +52,28 @@ public class MainActivity extends ActionBarActivity {
             ex.printStackTrace();
         }
 
+        ListView entries_list = (ListView) findViewById(R.id.entries_list);
+        entries_list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Log.i("Message: ", String.valueOf(position));
+                // Cursor cursor = ((SimpleCursorAdapter)parent.getAdapter()).getCursor();
+                // cursor.moveToPosition(position);
+
+                String text_value = (String) parent.getItemAtPosition(position);
+                PostEntryDBHandler db = new PostEntryDBHandler(getApplicationContext());
+
+                PostEntry data = db.getPostEntry(text_value);
+                Log.i("URL: ", data.getUrl());
+
+                Intent intent = new Intent(MainActivity.this, WebViewActivity.class);
+                Bundle bundle = new Bundle();
+
+                bundle.putString("URL", data.getUrl());
+                intent.putExtras(bundle);
+                startActivity(intent);
+            }
+        });
 
     }
 
@@ -174,6 +195,7 @@ public class MainActivity extends ActionBarActivity {
 
                     String stored_etag = sharedPreferences.getString("ETag", "");
                     String etag_value = getEtag(urls[0]);
+
 
                     if (!stored_etag.equals(etag_value)) {
                         Log.i("MESSAGE:", "Fetching new entries");

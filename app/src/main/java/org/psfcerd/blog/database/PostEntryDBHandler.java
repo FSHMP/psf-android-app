@@ -83,6 +83,20 @@ public class PostEntryDBHandler extends SQLiteOpenHelper {
         }
     }
 
+    // To retrieve a Single PostEntry
+    public PostEntry getPostEntry(String title){
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        // Query construction
+        String SEARCH_BY_TITLE = "SELECT title, url FROM " + TABLE_NAME + " WHERE " + COLUMN_NAME_TITLE + "= \"" + title + "\"";
+        Cursor cursor = db.rawQuery(SEARCH_BY_TITLE, null);
+        if(cursor != null)
+            cursor.moveToFirst();
+
+        PostEntry post_entry = new PostEntry(cursor.getString(0), cursor.getString(1), null, null, null);
+        return post_entry;
+    }
+
     // To Delete a Single PostEntry
     public void deletePostEntry(PostEntry postEntry){
         SQLiteDatabase db = this.getWritableDatabase();
